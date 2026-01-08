@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "MoeKoe Music Download",
+  "version": "1.0.0",
+  "description": "MoeKoe Music 音乐下载插件",
+  "permissions": [
+    "scripting"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_title": "MoeKoe Music 音乐下载",
+    "default_icon": "logo.png",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "256": "logo.png"
+  }
+}
