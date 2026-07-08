@@ -717,6 +717,12 @@
                 .moekoe-playlist-select-all:hover {
                     color: white;
                 }
+                .moekoe-playlist-item.drag-hover {
+                    background: rgba(255, 107, 107, 0.12);
+                }
+                .moekoe-playlist-item.drag-hover {
+                    background: rgba(255, 107, 107, 0.12);
+                }
                 .moekoe-playlist-empty {
                     text-align: center;
                     color: rgba(255, 255, 255, 0.3);
@@ -1258,6 +1264,137 @@
                 }
                 updateUI();
             });
+
+            // ---------- 拖拽滑动选取（边缘持续滚动 + 全body拖拽） ----------
+            let isDragging = false;
+            let dragAnchorIndex = -1;
+            let dragSelectMode = null;
+            const dragToggled = new Set();
+            let autoScrollTimer = null;
+            let lastMouseX = 0;
+            let lastMouseY = 0;
+            let lastContainerRect = null;
+
+            const EDGE_THRESHOLD = 50;
+            const BASE_SCROLL_SPEED = 4;
+            const MAX_SCROLL_SPEED = 15;
+
+            const getScrollInfo = function () {
+                if (!lastContainerRect) return { dir: 0, speed: 0 };
+                const distFromTop = lastMouseY - lastContainerRect.top;
+                const distFromBottom = lastContainerRect.bottom - lastMouseY;
+                if (distFromTop < EDGE_THRESHOLD && distFromTop > 0 && listContainer.scrollTop > 0) {
+                    return { dir: -1, speed: Math.max(BASE_SCROLL_SPEED, MAX_SCROLL_SPEED * (1 - distFromTop / EDGE_THRESHOLD)) };
+                }
+                if (distFromBottom < EDGE_THRESHOLD && distFromBottom > 0 && listContainer.scrollTop < listContainer.scrollHeight - listContainer.clientHeight) {
+                    return { dir: 1, speed: Math.max(BASE_SCROLL_SPEED, MAX_SCROLL_SPEED * (1 - distFromBottom / EDGE_THRESHOLD)) };
+                }
+                return { dir: 0, speed: 0 };
+            };
+
+            const startAutoScroll = function () {
+                if (autoScrollTimer) return;
+                autoScrollTimer = setInterval(() => {
+                    if (!isDragging) { stopAutoScroll(); return; }
+                    const info = getScrollInfo();
+                    if (info.dir === 0) return;
+                    listContainer.scrollTop += info.dir * info.speed;
+                    const elem = document.elementFromPoint(lastMouseX, lastMouseY);
+                    if (elem) {
+                        const item = elem.closest('.moekoe-playlist-item');
+                        if (item) {
+                            const index = parseInt(item.dataset.index);
+                            if (!isNaN(index) && !dragToggled.has(index)) {
+                                dragToggled.add(index);
+                                if (dragSelectMode) {
+                                    allSelected.add(index);
+                                    item.classList.add('selected');
+                                    item.querySelector('.moekoe-playlist-item-checkbox').textContent = '✓';
+                                } else {
+                                    allSelected.delete(index);
+                                    item.classList.remove('selected');
+                                    item.querySelector('.moekoe-playlist-item-checkbox').textContent = '';
+                                }
+                                updateUI();
+                            }
+                        }
+                    }
+                }, 16);
+            };
+
+            const stopAutoScroll = function () {
+                if (autoScrollTimer) {
+                    clearInterval(autoScrollTimer);
+                    autoScrollTimer = null;
+                }
+            };
+
+            listContainer.addEventListener('mousedown', function (e) {
+                const item = e.target.closest('.moekoe-playlist-item');
+                if (!item) return;
+                e.preventDefault();
+                const index = parseInt(item.dataset.index);
+                if (isNaN(index)) return;
+
+                isDragging = true;
+                dragAnchorIndex = index;
+                dragToggled.clear();
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                lastContainerRect = listContainer.getBoundingClientRect();
+
+                if (allSelected.has(index)) {
+                    dragSelectMode = false;
+                    allSelected.delete(index);
+                    item.classList.remove('selected');
+                    item.querySelector('.moekoe-playlist-item-checkbox').textContent = '';
+                } else {
+                    dragSelectMode = true;
+                    allSelected.add(index);
+                    item.classList.add('selected');
+                    item.querySelector('.moekoe-playlist-item-checkbox').textContent = '✓';
+                }
+                dragToggled.add(index);
+                updateUI();
+                startAutoScroll();
+            });
+
+            document.addEventListener('mousemove', function (e) {
+                if (!isDragging) return;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                lastContainerRect = listContainer.getBoundingClientRect();
+
+                const item = e.target.closest('.moekoe-playlist-item');
+                if (!item) return;
+                const index = parseInt(item.dataset.index);
+                if (isNaN(index) || dragToggled.has(index)) return;
+
+                dragToggled.add(index);
+
+                if (dragSelectMode) {
+                    allSelected.add(index);
+                    item.classList.add('selected');
+                    item.querySelector('.moekoe-playlist-item-checkbox').textContent = '✓';
+                } else {
+                    allSelected.delete(index);
+                    item.classList.remove('selected');
+                    item.querySelector('.moekoe-playlist-item-checkbox').textContent = '';
+                }
+                updateUI();
+            });
+
+            const stopDrag = function () {
+                if (isDragging) {
+                    isDragging = false;
+                    dragAnchorIndex = -1;
+                    dragSelectMode = null;
+                    dragToggled.clear();
+                    stopAutoScroll();
+                }
+            };
+
+            document.addEventListener('mouseup', stopDrag);
 
             // ---------- 全选/取消全选 ----------
             selectAllBtn.addEventListener('click', function () {
