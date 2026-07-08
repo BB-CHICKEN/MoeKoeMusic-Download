@@ -1435,7 +1435,7 @@
                     results.push({ success: true, song, gid });
 
                     if (i < songs.length - 1) {
-                        await this.sleep(1000);
+                        await this.sleep(500 + Math.random() * 1000);
                     }
 
                 } catch (error) {
@@ -2215,10 +2215,10 @@
     function initDownloadManager() {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
-                setTimeout(initialize, 1000);
+                setTimeout(initialize, 500 + Math.random() * 1000);
             });
         } else {
-            setTimeout(initialize, 1000);
+            setTimeout(initialize, 500 + Math.random() * 1000);
         }
 
         function initialize() {
