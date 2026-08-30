@@ -852,7 +852,10 @@
         // ==================== 通过Hash获取歌曲URL ====================
         async fetchSongUrlByHash(hash, quality = 'high') {
             try {
-                // 【修改】强制注册设备，失败则抛出错误
+                const resolvedQuality = this.getResolvedQuality();
+                if (resolvedQuality) {
+                    quality = resolvedQuality;
+                }
                 await this.registerDevice();
                 const url = `http://127.0.0.1:6521/song/url?hash=${hash}&quality=${quality}&ppage_id=356753938`;
                 logger.log(`获取歌曲URL: ${url}`);
@@ -950,6 +953,17 @@
                 return '';
             }
         }
+        getResolvedQuality() {
+            try {
+                const raw = localStorage.getItem('current_song');
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                return data.resolvedQuality || null;
+            } catch (e) {
+                return null;
+            }
+        }
+
         // ==================== 工具函数 ====================
         sanitizeFilename(name) {
             if (!name) return 'unknown';

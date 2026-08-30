@@ -1,0 +1,70 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '.github/**'
+      - 'README.md'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from manifest.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag v${{ steps.version.outputs.version }} already exists, skipping release."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Package extension
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          zip -r "MoeKoeMusic-Download-v${{ steps.version.outputs.version }}.zip" \
+            manifest.json \
+            content.js \
+            popup.html \
+            logo.png
+
+      - name: Generate Release Notes
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          echo "## MoeKoe Music Download v${{ steps.version.outputs.version }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### 安装说明" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "1. 下载下方的 \`MoeKoeMusic-Download-v${{ steps.version.outputs.version }}.zip\`" >> release_notes.md
+          echo "2. 进入 MoeKoe Music 插件管理页面进行安装" >> release_notes.md
+          echo "3. 安装完成后重启 MoeKoe Music" >> release_notes.md
+
+      - name: Create Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: v${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          files: MoeKoeMusic-Download-v${{ steps.version.outputs.version }}.zip
+          draft: false
+          prerelease: false

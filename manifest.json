@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MoeKoe Music Download",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MoeKoe Music 音乐下载插件",
   "permissions": [
     "scripting"
