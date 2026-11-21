@@ -849,6 +849,22 @@
             return null;
         }
 
+        // 从 apiModeConfig 读取 host 和 port，构造 API 基础地址
+        getApiBaseUrl() {
+            try {
+                const raw = localStorage.getItem('apiModeConfig');
+                if (raw) {
+                    const config = JSON.parse(raw);
+                    const host = config.host || '127.0.0.1';
+                    const port = config.port || '6520';
+                    return `http://${host}:${port}`;
+                }
+            } catch (e) {
+                logger.warn('解析 apiModeConfig 失败，使用默认地址', e);
+            }
+            return 'http://127.0.0.1:6520';
+        }
+
         // ==================== 通过Hash获取歌曲URL ====================
         async fetchSongUrlByHash(hash, quality = 'high') {
             try {
@@ -857,10 +873,10 @@
                     quality = resolvedQuality;
                 }
                 await this.registerDevice();
-                const url = `http://127.0.0.1:6521/song/url?hash=${hash}&quality=${quality}&ppage_id=356753938`;
+                const url = `${this.getApiBaseUrl()}/song/url?hash=${hash}&quality=${quality}&ppage_id=356753938`;
                 logger.log(`获取歌曲URL: ${url}`);
 
-                const authHeader = this.getAuthHeader(); // 需要实现此方法
+                const authHeader = this.getAuthHeader();
 
                 const response = await fetch(url, {
                     method: 'GET',
@@ -869,7 +885,6 @@
                         'Referer': window.location.origin,
                         'Origin': window.location.origin,
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        // ★★★ 添加 Authorization 头 ★★★
                         'Authorization': authHeader
                     }
                 });
@@ -881,7 +896,7 @@
 
                 const data = await response.json();
 
-                // ★★★ 核心修复：处理 url 为数组的情况 ★★★
+                // 处理 url 为数组的情况
                 let downloadUrl = null;
                 if (data.url) {
                     if (Array.isArray(data.url) && data.url.length > 0) {
@@ -913,7 +928,7 @@
 
         async registerDevice() {
             try {
-                const response = await fetch('http://127.0.0.1:6521/register/dev', {
+                const response = await fetch(`${this.getApiBaseUrl()}/register/dev`, {
                     method: 'GET',
                     headers: { 'Accept': 'application/json' }
                 });
@@ -925,11 +940,9 @@
                 return data;
             } catch (e) {
                 logger.error('设备注册失败:', e);
-                // 修改：抛出异常，不再返回 null
                 throw new Error('设备注册失败: ' + e.message);
             }
         }
-        // 自动从 localStorage 中提取认证信息
         // 从 MoeData 中获取认证头
         getAuthHeader() {
             try {
@@ -1166,8 +1179,7 @@
             this.showPlaylistSelector(queueData);
         }
 
-        // ==================== 播放列表选择弹窗（无搜索、全选正常） ====================
-        // ==================== 播放列表选择弹窗（修复版） ====================
+        // ==================== 播放列表选择弹窗 ====================
         showPlaylistSelector(queueData) {
             // 移除旧弹窗
             const oldOverlay = document.querySelector('.moekoe-overlay');
@@ -1180,7 +1192,7 @@
             panel.className = 'moekoe-panel';
             panel.style.width = '640px';
 
-            // 存储选中索引的 Set（默认全选）
+            // 默认全选
             const allSelected = new Set(queueData.map((_, i) => i));
 
             // ---------- 渲染列表 ----------
@@ -1209,10 +1221,9 @@
                 updateUI();
             };
 
-            // ---------- 更新 UI（关键修复：使用 Array.from） ----------
+            // ---------- 更新 UI ----------
             const updateUI = () => {
                 const items = listContainer.querySelectorAll('.moekoe-playlist-item');
-                // 转为数组才能使用 filter / every
                 const itemsArray = Array.from(items);
                 const selectedCount = itemsArray.filter(el => el.classList.contains('selected')).length;
                 statsEl.textContent = `已选 ${selectedCount} / ${queueData.length} 首`;
@@ -1223,7 +1234,7 @@
                 selectAllBtn.textContent = allChecked ? '取消全选' : '全选';
             };
 
-            // ---------- 构建面板 HTML（无搜索框） ----------
+            // ---------- 构建面板 HTML ----------
             panel.innerHTML = `
                 <div class="moekoe-panel-header">
                     <h3>📋 选择要下载的歌曲</h3>
@@ -1260,26 +1271,7 @@
             // ---------- 初始渲染 ----------
             renderList();
 
-            // ---------- 事件：点击歌曲项（事件委托） ----------
-            listContainer.addEventListener('click', function (e) {
-                const item = e.target.closest('.moekoe-playlist-item');
-                if (!item) return;
-                const index = parseInt(item.dataset.index);
-                if (isNaN(index)) return;
-
-                if (allSelected.has(index)) {
-                    allSelected.delete(index);
-                    item.classList.remove('selected');
-                    item.querySelector('.moekoe-playlist-item-checkbox').textContent = '';
-                } else {
-                    allSelected.add(index);
-                    item.classList.add('selected');
-                    item.querySelector('.moekoe-playlist-item-checkbox').textContent = '✓';
-                }
-                updateUI();
-            });
-
-            // ---------- 拖拽滑动选取（边缘持续滚动 + 全body拖拽） ----------
+            // ---------- 拖拽滑动选取 ----------
             let isDragging = false;
             let dragAnchorIndex = -1;
             let dragSelectMode = null;
